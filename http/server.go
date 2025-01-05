@@ -3323,8 +3323,6 @@ func (srv *Server) Serve(l net.Listener) error {
 		}
 	}
 
-	var tempDelay time.Duration // how long to sleep on accept failure
-
 	ctx := context.WithValue(baseCtx, ServerContextKey, srv)
 	for {
 		rw, err := l.Accept()
@@ -3333,16 +3331,6 @@ func (srv *Server) Serve(l net.Listener) error {
 				return ErrServerClosed
 			}
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
-				} else {
-					tempDelay *= 2
-				}
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
-				}
-				srv.logf("http: Accept error: %v; retrying in %v", err, tempDelay)
-				time.Sleep(tempDelay)
 				continue
 			}
 			return err
@@ -3354,7 +3342,6 @@ func (srv *Server) Serve(l net.Listener) error {
 				panic("ConnContext returned nil")
 			}
 		}
-		tempDelay = 0
 		c := srv.newConn(rw)
 		c.setState(c.rwc, StateNew, runHooks) // before Serve can return
 		go c.serve(connCtx)
